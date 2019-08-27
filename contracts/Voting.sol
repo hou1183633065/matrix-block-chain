@@ -8,6 +8,9 @@ contract Voting{
     mapping(bytes32 => uint) candidatesVotingCount;
     // 初始化合约，创建候选人数组
     function createVoting(bytes32[] memory _candidates) public {
+        for(uint i = 0; i < candidates.length; i++) {
+            delete candidates[i];
+        }
         candidates = _candidates;
     }
     // 通过映射，增加候选人票数

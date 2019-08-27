@@ -1,12 +1,32 @@
 <template>
   <div class="home">
-    <ul>
-      <li v-for="(item, index) in candidates" :key="index">
-        <span> 姓名：{{item.name}}</span>
-        <span>,共{{item.count}}票</span>
-        <button @click="handleVoting(index)">投票</button>
-      </li>
-    </ul>
+    <el-button type="primary" @click="createContract">创建投票</el-button>
+    <el-button type="success" @click="getAllpersonVoting">查询投票</el-button>
+      <el-table
+        class="tables"
+        :data="candidates"
+        border
+        style="width: 420px;">
+        <el-table-column
+          align="center"
+          prop="name"
+          label="姓名">
+        </el-table-column>
+        <el-table-column
+          align="center"
+          prop="count"
+          label="总票数"
+          width="100">
+        </el-table-column>
+        <el-table-column
+          align="center"
+          label="操作"
+          width="100">
+          <template slot-scope="scope">
+            <el-button  type="warning" size="small" @click="handleVoting(scope.$index)">{{scope.count}}投票</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
   </div>
 </template>
 
@@ -22,13 +42,15 @@ import { chainUrl, chainId, address } from "../../utils/config";
 
 let httpProvider = new HttpProvider(chainUrl);
 
-// MAN.49BW4sEgxkqriSMojnvyS4KEgGZFz
-// hash:0x0467428bfa805084ea2cc16ab039c170bf825f3519ef98d4d25ca6ca5e4046dc
-// 钱包私钥d9ff3266d3b5dad3af34e8d03fd9ac8f92ccc788694ef81c64747ebbdbc8463a
-const contractManAdd = "MAN.49BW4sEgxkqriSMojnvyS4KEgGZFz";
+// MAN.2Vziwdup6Ba3H6EC3Sn4ghCVM2Gpg
+// hash:0x7ae80ea496f970163e19cad54ba0b3eceb580dd65d8a4a7c07fecb3e9e8ab551
+// 合约MAN地址
+const contractManAdd = "MAN.2Vziwdup6Ba3H6EC3Sn4ghCVM2Gpg";
+// 合约hash地址
 const contractAddress =
-  "0x0467428bfa805084ea2cc16ab039c170bf825f3519ef98d4d25ca6ca5e4046dc";
+  "0x7ae80ea496f970163e19cad54ba0b3eceb580dd65d8a4a7c07fecb3e9e8ab551";
 
+// 钱包私钥d9ff3266d3b5dad3af34e8d03fd9ac8f92ccc788694ef81c64747ebbdbc8463a
 const privateKey = new Buffer(
   "d9ff3266d3b5dad3af34e8d03fd9ac8f92ccc788694ef81c64747ebbdbc8463a",
   "hex"
@@ -61,12 +83,29 @@ function getTotalVoting(name = "") {
     resolve(httpProvider.toDecimal(resultData));
   });
 }
+
+function demandTransactionStatus(hash) {
+  console.log("当前交易hash", hash);
+
+  return new Promise(resolve => {
+    function getTransactionReceipt() {
+      httpProvider.man.getTransactionReceipt(hash, (err, result) => {
+        if (!result) {
+          setTimeout(() => {
+            getTransactionReceipt();
+          }, 1000);
+        } else {
+          resolve(result);
+        }
+      });
+    }
+    getTransactionReceipt();
+  });
+}
 export default {
-  name: "home",
   components: {},
   data() {
     return {
-      msg: "hello123",
       candidates: [
         {
           name: "houzhiqiang",
@@ -92,27 +131,28 @@ export default {
     };
   },
   mounted() {
-    this.createContract();
-    this.getAllpersonVoting();
+    let code = contract.getNum.getData(2);
+    console.log(code);
+    let getParma = {
+      to: contractManAdd,
+      data: code,
+      currency: "MAN"
+    };
+    let resultData = httpProvider.man.call(getParma, "latest");
+    console.log(resultData);
+
+    let mining = httpProvider.man.mining;
+    console.log(mining);
+    let coinbase = httpProvider.man.coinbase;
+    console.log(coinbase);
   },
   methods: {
     createContract() {
-      console.log(httpProvider);
-      console.log(contract);
       let names = this.candidates.map(item => item.name);
       let createCode = contract.createVoting.getData(names);
-      console.log(createCode);
-      // let newArr = [
-      //   "0x000000000000000000000000000000000005686f757a68697169616e67000000",
-      //   "0x0000000000000000000000000000000000000000007a68616f7a68656e677775",
-      //   "0x0000000000000000000000000000000000000000006c69796f6e676a69650000",
-      //   "0x000000000000000000000000000000000000000000000077616e676665690000",
-      //   "0x00000000000000000000000000000000000000000000007a68616e676d696e67"
-      // ];
-
       let rawTx = {
-        // to: contractManAdd,
-        // from: address,
+        // 合约地址
+        to: contractManAdd,
         value: 0,
         data: createCode,
         CommitTime: Date.now(),
@@ -123,6 +163,8 @@ export default {
         chainId
       };
       let nonce = httpProvider.man.getTransactionCount(address);
+      console.log(nonce);
+      
       rawTx.nonce = httpProvider.toHex(nonce);
       const tx = new Tx(rawTx);
       tx.sign(privateKey);
@@ -139,25 +181,25 @@ export default {
       rawTx["extra_to"] = [];
       rawTx.gas = httpProvider.toHex(new BigNumber(rawTx.gas).toString());
       rawTx.value = httpProvider.toHex(new BigNumber(rawTx.value).toString());
-      console.log(rawTx);
-
-      // httpProvider.man.sendTransaction({ data: createCode }, (err, address)=> {
-      //   let receipt = httpProvider.man.getTransactionReceipt(contractAddress);
-      //   console.log(receipt);
-      // });
-      httpProvider.man.sendRawTransaction(rawTx, (error, result) => {
-        // let receipt = httpProvider.man.getTransactionReceipt(contractAddress);
-        console.log(error, result);
+      httpProvider.man.sendRawTransaction(rawTx, async (error, result) => {
+        if (!error) {
+          let newData = await demandTransactionStatus(result);
+          console.log("创建成功");
+          console.log(newData);
+        } else {
+          console.log(error);
+        }
       });
     },
     async handleVoting(index) {
+      
       let name = this.candidates[index].name;
+      console.log(name);
       let votingCode = contract.votingToPerson.getData(name);
       console.log(votingCode);
 
       let rawTx = {
         to: contractManAdd,
-        from: address,
         value: 0,
         data: votingCode,
         CommitTime: Date.now(),
@@ -188,12 +230,17 @@ export default {
       rawTx.value = httpProvider.toHex(new BigNumber(rawTx.value).toString());
 
       httpProvider.man.sendRawTransaction(rawTx, async (error, result) => {
-        console.log(error, result);
-        // let receipt = httpProvider.man.getTransactionReceipt(contractAddress);
-        // console.log(receipt);
-        let resNum = await getTotalVoting(name);
-        console.log(resNum);
-        // this.candidates[index].count += 1;
+        if (!error) {
+          let newData = await demandTransactionStatus(result);
+          console.log("投票成功");
+          console.log(newData);
+          let resNum = await getTotalVoting(name);
+          console.log("查询个人投票成功");
+          console.log(resNum);
+          this.candidates[index].count = resNum;
+        } else {
+          console.log(error);
+        }
       });
     },
     async getAllpersonVoting() {
@@ -211,3 +258,12 @@ export default {
   }
 };
 </script>
+
+
+<style lang="stylus">
+.home {
+  .tables {
+    margin: 20px auto;
+  }
+}
+</style>
